@@ -5,8 +5,11 @@ from scipy.spatial import cKDTree
 import multiprocessing as mp
 from scipy.signal import savgol_filter
 from scipy.interpolate import RegularGridInterpolator
+from astropy.convolution import convolve
 
-def cressman_ppi_interp(radar, coords, Rc, field_names, k = 100, filter_its = 0, verbose = True,**kwargs):#mu =5, poly =3
+def cressman_ppi_interp(radar, coords, Rc, field_names, k = 100, filter_its = 0, verbose = True,
+                        window_length = 11, polyorder = 3, **kwargs):
+    #mu =5, poly =3
     """
     Interpolate multiple fields from a radar object to a grid. This 
     is an implementation of the method described in Dahl et. al. (2019).
@@ -48,14 +51,12 @@ def cressman_ppi_interp(radar, coords, Rc, field_names, k = 100, filter_its = 0,
             if verbose:
                 print('Filtering...')
             
-            interpolator = RegularGridInterpolator(coords, grid)
-            smooth = interpolator(np.c_[Z.ravel(),Y.ravel(),X.ravel()]).reshape(dims)
-            
             for i in range(filter_its):
-#                 smooth = filter3D(smooth, mu, poly, **kwargs)
-                smooth = savgol_filter(smooth, axis=0, **kwargs)
-                smooth = savgol_filter(smooth, axis=1, **kwargs)
-                smooth = savgol_filter(smooth, axis=2, **kwargs)
+                kernel =  np.ones((wind_length, wind_length))/np.float(window)
+                smooth = convolve(grid.filled(np.nan), kernel, boundary = 'extend')
+#                 smooth = savgol_filter(smooth, window_length,polyorder,axis=0, **kwargs)
+#                 smooth = savgol_filter(smooth, window_length,polyorder,axis=1, **kwargs)
+#                 smooth = savgol_filter(smooth, window_length,polyorder,axis=2, **kwargs)
                 
             grid = smooth.copy()
             
