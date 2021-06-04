@@ -7,8 +7,22 @@ from scipy.signal import savgol_filter
 from scipy.interpolate import RegularGridInterpolator
 from astropy.convolution import convolve
 
-def cressman_ppi_interp(radar, coords, Rc, field_names, k = 100, filter_its = 0, verbose = True,
-                        window_length = 11, polyorder = 3, **kwargs):
+def get_leroy_roi(radar, coords, frac = 0.55):
+    """
+    Get a radius of influence for the ppis based on the azimuthal spacing of each sweep
+    
+    Refer to Dahl et al (2019) for details here. 
+    """
+    roi = 0
+    rmax = np.sqrt(max(coords[0])**2 + max(coords[1])**2 + max(coords[2])**2)
+    for i in range(radar.nsweeps):
+        az = np.amax(np.radians(np.amax(np.diff(np.sort(radar.azimuth['data'][radar.get_slice(i)])))))
+        r = frac * az * rmax
+        if r > roi:
+            roi = r
+    return roi
+
+def cressman_ppi_interp(radar, coords, field_names,Rc = None, k = 100, filter_its = 0, verbose = True, kernel = None, corr_lens = None):
     #mu =5, poly =3
     """
     Interpolate multiple fields from a radar object to a grid. This 
@@ -17,11 +31,12 @@ def cressman_ppi_interp(radar, coords, Rc, field_names, k = 100, filter_its = 0,
     Inputs:
     radar (Pyart object): radar to be interpolated
     coords (tuple): tuple of 3 1d arrays containing z, y, x of grid
-    Rc (float): Cressman radius of interpolation
     field_names (list or string): field names in radar to interpolate
+    Rc (float): Cressman radius of interpolation, calculated if not supplied
     k (int): max number of points within a radius of influence
     filter_its (int): number of filter iterations for the low-pass filter
-    kwargs passed to the scipy.savgol_filter function
+    kernel (astropy.kernel): user defined kernel for smoothing (boxcar filter if not specified)
+    corr_lens (tuple): correlation lengths for smoothing filter in vert. and horiz. dims resp.
     
     """
     if type(field_names) != list:
@@ -30,6 +45,15 @@ def cressman_ppi_interp(radar, coords, Rc, field_names, k = 100, filter_its = 0,
     fields = []
     dims = [len(coord) for coord in coords]
     Z, Y, X = np.meshgrid(coords[0], coords[1], coords[2], indexing = 'ij')
+    dz = np.mean(np.diff(np.sort(coords[0])))
+    dy = np.mean(np.diff(np.sort(coords[1])))
+    dx = np.mean(np.diff(np.sort(coords[2])))
+    dh = np.mean((dy, dx))
+    
+    if Rc is None:
+        Rc = get_leroy_roi(radar, coords, frac = 0.55)
+        if verbose:
+            print("Radius of influence set to {} m.".format(Rc))
     
     ppi_height = interpolate_to_ppi(radar, coords, Rc, 'height', k=k)
     
@@ -50,13 +74,18 @@ def cressman_ppi_interp(radar, coords, Rc, field_names, k = 100, filter_its = 0,
         if filter_its > 0:
             if verbose:
                 print('Filtering...')
-            
+                
+            if kernel is None:
+                if corr_lens == None:
+                    raise NotImplementedError("""You must either input a convolution kernel 
+                        ('kernel') or some correlation lengths ('corr_len').""")
+                v_window = int(np.ceil(corr_lens[0]/dz) // 2 * 2 + 1)
+                h_window = int(np.ceil(corr_lens[1]/dh) // 2 * 2 + 1)
+                kernel =  np.ones((v_window, h_window, h_window))/np.float(v_window * h_window * h_window)
+                
+            smooth = grid.copy()
             for i in range(filter_its):
-                kernel =  np.ones((wind_length, wind_length))/np.float(window)
-                smooth = convolve(grid.filled(np.nan), kernel, boundary = 'extend')
-#                 smooth = savgol_filter(smooth, window_length,polyorder,axis=0, **kwargs)
-#                 smooth = savgol_filter(smooth, window_length,polyorder,axis=1, **kwargs)
-#                 smooth = savgol_filter(smooth, window_length,polyorder,axis=2, **kwargs)
+                smooth = convolve(smooth, kernel, boundary = 'extend')
                 
             grid = smooth.copy()
             
