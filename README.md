@@ -8,9 +8,9 @@ A Python3 implementation of a radar gridding algorithm that uses linear interpol
 
 Use the `qc.mask_invalid_data` function to mask radar fields. This function is effectively a despeckle filter in ppi space and is useful for cleaning up radar fields before they enter gridding algorithms. Here are some of the import parameters:
 
-- *correlation_length*: the length of the boxcar smoothing filter along each ray, bigger length > more smoothing
-- *min_field*: minimum field threshold used to identify contiguous objects in radar data 
-- *min_area*: contiguous objects with areas smaller than this will be masked
+- `correlation_length`: the length of the boxcar smoothing filter along each ray, bigger length > more smoothing
+- `min_field`: minimum field threshold used to identify contiguous objects in radar data 
+- `min_area`: contiguous objects with areas smaller than this will be masked
 
 ### Gridding:
 
