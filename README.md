@@ -23,10 +23,10 @@ Use the `leroi.cressman_ppi_interp` function to grid radar data onto a cartesian
 - `corr_lens`: tuple containing correlation lengths in vertical and horizontal directions. 
 
 ### Potential Improvements:
- - [] Output a PyART grid with the interpolated fields instead of numpy arrays. Let me know if there's an appetite for this, I've got some code written already I could use for it. 
- - [] Confirm the benefits of post-gridding smoothing outlined by Dahl et. al. (2019) (refer to `post_smoothing.ipynb` for example). 
- - [] Make a kernel similar to the Leise filter they describe (I've only been able to find 1970's fortran code for this filter). The `scipy.savgol_filter` looks very similar (refer to `filtering.ipynb` for example). 
- - [] Optimise with a `numba` worker function. 
+ - [ ] Output a PyART grid with the interpolated fields instead of numpy arrays. Let me know if there's an appetite for this, I've got some code written already I could use for it. 
+ - [ ] Confirm the benefits of post-gridding smoothing outlined by Dahl et. al. (2019) (refer to `post_smoothing.ipynb` for example). 
+ - [ ] Make a kernel similar to the Leise filter they describe (I've only been able to find 1970's fortran code for this filter). The `scipy.savgol_filter` looks very similar (refer to `filtering.ipynb` for example). 
+ - [ ] Optimise with a `numba` worker function. 
 
 ## References:
 - Dahl, N. A., Shapiro, A., Potvin, C. K., Theisen, A., Gebauer, J. G., Schenkman, A. D., & Xue, M. (2019). High-Resolution, Rapid-Scan Dual-Doppler Retrievals of Vertical Velocity in a Simulated Supercell, Journal of Atmospheric and Oceanic Technology, 36(8), 1477-1500. Retrieved Jun 5, 2021, from https://journals.ametsoc.org/view/journals/atot/36/8/jtech-d-18-0211.1.xml
