@@ -106,7 +106,7 @@ def cressman_ppi_interp(
         return fields[0]
 
 
-def interpolate_to_ppi(radar, coords, Rc, field, k=100, fill_ground=True):
+def interpolate_to_ppi(radar, coords, Rc, field, k=50, fill_ground=True):
     """
     A function for interpolating radar fields to ppi surfaces in 
     Cartesian coordinates. 
