@@ -18,7 +18,7 @@ def smooth_ppi(radar, field, sweep, c_len):
     """
     window = int(np.ceil(c_len / np.mean(np.diff(radar.range["data"]))) // 2 * 2 + 1)
     data = radar.get_field(sweep, field).filled(np.nan)
-    kernel = np.ones((1, window)) / np.float(window)
+    kernel = np.ones((1, window)) / float(window)
     smooth = convolve(data, kernel, boundary="extend")
     mask = gate_range_mask(smooth, window)
     return np.ma.masked_array(smooth, np.logical_or(np.isnan(smooth), mask))
