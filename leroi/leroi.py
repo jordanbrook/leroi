@@ -207,7 +207,7 @@ def interp_along_axis(y, x, newx, axis, inverse=False, method="linear"):
     return np.moveaxis(newy, 0, axis)
 
 
-def setup_interpolate(radar, coords, dmask, Rc, k=200, verbose = True):
+def setup_interpolate(radar, coords, dmask, Rc, k=200, verbose = True, multiprocess=False):
     """
     A function for interpolating radar fields to ppi surfaces in 
     Cartesian coordinates. 
@@ -218,6 +218,7 @@ def setup_interpolate(radar, coords, dmask, Rc, k=200, verbose = True):
     Rc (float): Cressman radius of interpolation
     field (string): field name in radar or 'height' for altitude
     k (int): max number of points within a radius of influence
+    multiprocess (logical): True enables multiprocessing on KDtree query
     """
     t0 = time.time()
     # setup stuff
@@ -246,7 +247,11 @@ def setup_interpolate(radar, coords, dmask, Rc, k=200, verbose = True):
         valid_radar_points = np.c_[y.ravel()[mask], x.ravel()[mask]]
         ndata = valid_radar_points.shape[0]
         tree = cKDTree(valid_radar_points)
-        d, idx = tree.query(np.c_[Y.ravel(), X.ravel()], k=k, distance_upper_bound=Rc, workers=1)
+        if multiprocess:
+            ncpu = mp.cpu_count()
+        else:
+            ncpu = 1
+        d, idx = tree.query(np.c_[Y.ravel(), X.ravel()], k=k, distance_upper_bound=Rc, workers=ncpu)
         
         # check if any kth weight is valid, and trim if possible
         valid = ~(idx == ndata)
@@ -276,7 +281,7 @@ def setup_interpolate(radar, coords, dmask, Rc, k=200, verbose = True):
     return weights, idxs, model_idxs[:,:max(model_lens)].astype(int), np.array(sws), model_lens
 
 def cressman_ppi_interp(radar, coords, field_names, gatefilter = None, Rc=None, k=100, 
-                        filter_its=0, verbose=True, kernel=None, corr_lens=None, ground_elevation = -999):
+                        filter_its=0, verbose=True, kernel=None, corr_lens=None, ground_elevation = -999, multiprocess=False):
     """
     Interpolate multiple fields from a radar object to a grid. This 
     is an implementation of the method described in Dahl et. al. (2019).
@@ -290,7 +295,7 @@ def cressman_ppi_interp(radar, coords, field_names, gatefilter = None, Rc=None, 
     filter_its (int): number of filter iterations for the low-pass filter
     kernel (astropy.kernel): user defined kernel for smoothing (boxcar filter if not specified)
     corr_lens (tuple): correlation lengths for smoothing filter in vert. and horiz. dims resp.
-    
+    multiprocess (logical): True enables multiprocessing on KDtree query
     """
     t0 = time.time()
 
@@ -307,7 +312,7 @@ def cressman_ppi_interp(radar, coords, field_names, gatefilter = None, Rc=None, 
             
     dmask = get_data_mask(radar, field_names)
     Rc = get_leroy_roi(radar, coords, frac=0.55)
-    weights, idxs, model_idxs, sw, model_lens = setup_interpolate(radar, coords, dmask, Rc, k)
+    weights, idxs, model_idxs, sw, model_lens = setup_interpolate(radar, coords, dmask, Rc, k, multiprocess=multiprocess)
     Z, Y, X = np.meshgrid(coords[0], coords[1], coords[2], indexing="ij")
     ppi_height = calculate_ppi_heights(radar, coords, Rc, ground_elevation = ground_elevation)
     
