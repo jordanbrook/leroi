@@ -5,8 +5,14 @@ import multiprocessing as mp
 import pyart
 import numpy as np
 from scipy.spatial import cKDTree
-from scipy.signal import savgol_filter
-from scipy.interpolate import RegularGridInterpolator
+from astropy.convolution import convolve
+from pyart.config import get_metadata
+import warnings
+import multiprocessing as mp
+
+import pyart
+import numpy as np
+from scipy.spatial import cKDTree
 from astropy.convolution import convolve
 from pyart.config import get_metadata
 
@@ -59,12 +65,14 @@ def get_leroy_roi(radar, coords, frac=0.55):
     return roi
 
 def calculate_ppi_heights(radar, coords, Rc, ground_elevation = -9999):
+    bb_height = 1e8
     slices = []
-    elevations = np.sort(radar.fixed_angle["data"])
-
-    Y, X = np.meshgrid(coords[1], coords[2], indexing = 'ij')
+    elevations = radar.fixed_angle["data"]
+    
     #sort sweep index to process from lowest sweep and ascend
-    sort_idx = np.argsort(radar.fixed_angle['data'])
+    sort_idx = list(np.argsort(elevations))
+    if 90.0 in elevations: sort_idx.remove(np.argwhere(elevations == 90))
+    Y, X = np.meshgrid(coords[1], coords[2], indexing = 'ij')
     for i in sort_idx:
         x, y, z = radar.get_gate_x_y_z(i)
         data = z.ravel()
@@ -82,16 +90,19 @@ def calculate_ppi_heights(radar, coords, Rc, ground_elevation = -9999):
 
         # put valid data into a resultant array and reshape to model grid
         slce = np.zeros(sw.shape)
+        # set lowest scan heights to zeros if requested
         if ((i==0) and (elevations[i] <= ground_elevation)):
             pass
+        # dont worry if there's no valid data, masked anyway
         elif len(data) == 0:
             pass
+        # perform weighted interp on valid heights
         else:
             slce[valid] = np.sum(data[idx] * w, axis=1)[valid] / sw[valid]
+
         slce = np.ma.masked_array(slce, mask=~valid)
         slices.append(slce.reshape((len(coords[1]), len(coords[2]))))
         
-    #sort lists by order of sweeps in radar    
     return np.ma.asarray(slices)
     
 
@@ -207,7 +218,7 @@ def interp_along_axis(y, x, newx, axis, inverse=False, method="linear"):
     return np.moveaxis(newy, 0, axis)
 
 
-def setup_interpolate(radar, coords, dmask, Rc, k=200, verbose = True, multiprocess=False):
+def setup_interpolate(radar, coords, dmask, Rc, k=200, verbose = True):
     """
     A function for interpolating radar fields to ppi surfaces in 
     Cartesian coordinates. 
@@ -218,20 +229,23 @@ def setup_interpolate(radar, coords, dmask, Rc, k=200, verbose = True, multiproc
     Rc (float): Cressman radius of interpolation
     field (string): field name in radar or 'height' for altitude
     k (int): max number of points within a radius of influence
-    multiprocess (logical): True enables multiprocessing on KDtree query
     """
     t0 = time.time()
     # setup stuff
     nsweeps = radar.nsweeps
     weights, idxs = [], []
-    elevations = np.sort(radar.fixed_angle["data"])
+    elevations = radar.fixed_angle["data"]
     Y, X = np.meshgrid(coords[1], coords[2], indexing="ij")
     trim = 0
     model_idxs = -np.ones((nsweeps, len(coords[1])*len(coords[2])))
     sws, model_lens = [], []
     
+    #sort sweep index to process from lowest sweep and ascend
+    sort_idx = list(np.argsort(elevations))
+    if 90.0 in elevations: sort_idx.remove(np.argwhere(elevations == 90))
+
     # loop through grid and define data, no mask for height data
-    for i in range(nsweeps):
+    for j, i in enumerate(sort_idx):
         x, y, z = radar.get_gate_x_y_z(i)
         mask = ~dmask[radar.get_slice(i)].flatten()
 
@@ -247,11 +261,7 @@ def setup_interpolate(radar, coords, dmask, Rc, k=200, verbose = True, multiproc
         valid_radar_points = np.c_[y.ravel()[mask], x.ravel()[mask]]
         ndata = valid_radar_points.shape[0]
         tree = cKDTree(valid_radar_points)
-        if multiprocess:
-            ncpu = mp.cpu_count()
-        else:
-            ncpu = 1
-        d, idx = tree.query(np.c_[Y.ravel(), X.ravel()], k=k, distance_upper_bound=Rc, workers=ncpu)
+        d, idx = tree.query(np.c_[Y.ravel(), X.ravel()], k=k, distance_upper_bound=Rc, workers=mp.cpu_count())
         
         # check if any kth weight is valid, and trim if possible
         valid = ~(idx == ndata)
@@ -270,18 +280,17 @@ def setup_interpolate(radar, coords, dmask, Rc, k=200, verbose = True, multiproc
         w[w < 0] = 0
         sw = np.sum(w, axis=1)
         model_idx = np.where(sw!=0)[0]
-        model_idxs[i][:len(model_idx)] = model_idx #use c index to preserve sweep order that's in radar objects
-
-        weights.append(w[model_idx,:kidx])
-        idxs.append(idx[model_idx,:kidx])
+        model_idxs[j][:len(model_idx)] = model_idx
         model_lens.append(len(model_idx))
         sws.append(sw)
-    
+        weights.append(w[model_idx,:kidx])
+        idxs.append(idx[model_idx,:kidx])
+
     # stack weights 
     return weights, idxs, model_idxs[:,:max(model_lens)].astype(int), np.array(sws), model_lens
 
 def cressman_ppi_interp(radar, coords, field_names, gatefilter = None, Rc=None, k=100, 
-                        filter_its=0, verbose=True, kernel=None, corr_lens=None, ground_elevation = -999, multiprocess=False):
+                        filter_its=0, verbose=True, kernel=None, corr_lens=None, ground_elevation = -999):
     """
     Interpolate multiple fields from a radar object to a grid. This 
     is an implementation of the method described in Dahl et. al. (2019).
@@ -295,14 +304,14 @@ def cressman_ppi_interp(radar, coords, field_names, gatefilter = None, Rc=None, 
     filter_its (int): number of filter iterations for the low-pass filter
     kernel (astropy.kernel): user defined kernel for smoothing (boxcar filter if not specified)
     corr_lens (tuple): correlation lengths for smoothing filter in vert. and horiz. dims resp.
-    multiprocess (logical): True enables multiprocessing on KDtree query
+    
     """
     t0 = time.time()
 
     if type(field_names) != list:
         field_names = [field_names,]
 
-    
+    fields = {}
     dims = [len(coord) for coord in coords]
 
     if Rc is None:
@@ -312,7 +321,7 @@ def cressman_ppi_interp(radar, coords, field_names, gatefilter = None, Rc=None, 
             
     dmask = get_data_mask(radar, field_names)
     Rc = get_leroy_roi(radar, coords, frac=0.55)
-    weights, idxs, model_idxs, sw, model_lens = setup_interpolate(radar, coords, dmask, Rc, k, multiprocess=multiprocess)
+    weights, idxs, model_idxs, sw, model_lens = setup_interpolate(radar, coords, dmask, Rc, k=200)            
     Z, Y, X = np.meshgrid(coords[0], coords[1], coords[2], indexing="ij")
     ppi_height = calculate_ppi_heights(radar, coords, Rc, ground_elevation = ground_elevation)
     
@@ -320,22 +329,26 @@ def cressman_ppi_interp(radar, coords, field_names, gatefilter = None, Rc=None, 
         warnings.warn("""\n There are invalid height values which will 
         ruin the linear interpolation. This most likely means the radar
         doesnt cover the entire gridded domain""")
+    
+    elevations = radar.fixed_angle["data"]
+    
+    #sort sweep index to process from lowest sweep and ascend
+    sort_idx = list(np.argsort(elevations))
+    if 90.0 in elevations: sort_idx.remove(np.argwhere(elevations == 90))
 
-    fields = {}
     for field in field_names:
         ppis  = np.zeros((radar.nsweeps, dims[1]*dims[2]))
         mask  = np.ones((radar.nsweeps, dims[1]*dims[2]))
-        sort_idx = np.argsort(radar.fixed_angle['data'])
-        for i in sort_idx:
-            slc = radar.get_slice(i)
+        for i,j in enumerate(sort_idx):
+            slc = radar.get_slice(j)
             data = radar.fields[field]['data'].filled(0)[slc][~dmask[slc]]
             if len(data) > 0:
                 ppis[i, model_idxs[i, :model_lens[i]]] = np.sum(data[idxs[i]] * weights[i], axis=1)/ sw[i, model_idxs[i, :model_lens[i]]]
                 mask[i, model_idxs[i, :model_lens[i]]] = 0
                 out = np.ma.masked_array(ppis.reshape((radar.nsweeps, dims[1], dims[2])), mask.reshape((radar.nsweeps, dims[1], dims[2])))
-        
+                
         grid = interp_along_axis(out.filled(np.nan), ppi_height, Z, axis=0, method="linear")
-
+        
         if filter_its > 0:
                 grid = smooth_grid(grid, coords,kernel,corr_lens,filter_its, verbose)
     
