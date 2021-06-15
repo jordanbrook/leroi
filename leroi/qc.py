@@ -18,7 +18,7 @@ def smooth_ppi(radar, field, sweep, c_len):
     """
     window = int(np.ceil(c_len / np.mean(np.diff(radar.range["data"]))) // 2 * 2 + 1)
     data = radar.get_field(sweep, field).filled(np.nan)
-    kernel = np.ones((1, window)) / np.float(window)
+    kernel = np.ones((1, window)) / float(window)
     smooth = convolve(data, kernel, boundary="extend")
     mask = gate_range_mask(smooth, window)
     return np.ma.masked_array(smooth, np.logical_or(np.isnan(smooth), mask))
@@ -76,7 +76,7 @@ def mask_invalid_data(
     replace_exsiting (bool): whether to create a new field with the mask or to add it to original
     """
     dR = np.mean(np.diff(radar.range["data"])) / 1e3
-
+    elevations = radar.fixed_angle['data']
     smooth_data, mask = np.ma.zeros((2, radar.nrays, radar.ngates))
     smooth_fn = field + "_smooth"
     nsweeps = radar.nsweeps
@@ -84,6 +84,8 @@ def mask_invalid_data(
         smooth_data[radar.get_slice(sweep)] = smooth_ppi(radar, field, sweep, correlation_length)
     radar.add_field_like(field, smooth_fn, smooth_data, replace_existing=True)
     for sweep in range(nsweeps):
+        if elevations[sweep] == 90.0:
+            continue # dont mask vertical scans
         dA = np.radians(np.mean(np.diff(np.sort(radar.azimuth["data"][radar.get_slice(sweep)]))))
         ranges = np.repeat(radar.range["data"][np.newaxis, :], radar.rays_per_sweep["data"][sweep], axis=0)
         corr = np.cos(np.radians(radar.fixed_angle["data"][sweep])) ** 2
