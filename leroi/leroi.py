@@ -453,7 +453,11 @@ def cressman_ppi_interp(
                     ppis.reshape((radar.nsweeps, dims[1], dims[2])), mask.reshape((radar.nsweeps, dims[1], dims[2]))
                 )
 
-        grid = interp_along_axis(out.filled(np.nan), ppi_height, Z, axis=0, method="linear")
+        try:
+            grid = interp_along_axis(out.filled(np.nan), ppi_height, Z, axis=0, method="linear")
+        except UnboundLocalError:
+            print(f"Problem with {field}. Field not processed.")
+            continue
 
         if filter_its > 0:
             grid = smooth_grid(grid, coords, kernel, corr_lens, filter_its, verbose)
