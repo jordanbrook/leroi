@@ -354,7 +354,7 @@ def _setup_interpolate(radar, coords, dmask, Rc, multiprocessing, k, verbose):
 def cressman_ppi_interp(
     radar,
     coords,
-    field_names,
+    field_names=None,
     gatefilter=None,
     Rc=None,
     k=100,
@@ -403,10 +403,11 @@ def cressman_ppi_interp(
     """
     t0 = time.time()
 
+    if field_names is None:
+        # No field defined. Processing all fields in radar.
+        field_names = [*radar.fields.keys()]
     if type(field_names) != list:
-        field_names = [
-            field_names,
-        ]
+        field_names = [field_names]
 
     fields = {}
     dims = [len(coord) for coord in coords]
