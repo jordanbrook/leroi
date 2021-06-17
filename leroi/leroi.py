@@ -312,7 +312,10 @@ def _setup_interpolate(radar, coords, dmask, Rc, multiprocessing, k, verbose):
         
         # check if any kth weight is valid, and trim if possible
         valid = ~(idx == ndata)
-        kidx = max(np.where(valid==1)[1])+1
+        if np.any(valid):
+            kidx = max(np.where(valid==1)[1])+1
+        else:
+            kidx = 0
         
         if valid[:,-1].sum() > 0:
             warnings.warn("\n Some points are being left out of radius of influence, make 'k' bigger!")
