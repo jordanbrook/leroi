@@ -298,8 +298,8 @@ def _setup_interpolate(radar, coords, dmask, Rc, multiprocessing, k, verbose):
 
         # dont bother with ckdtree if there's no data
         if mask.sum() == 0:
-            weights.append(np.empty((1,1)))
-            idxs.append(np.empty((1,1)))
+            weights.append(np.empty((1,1)).astype(int))
+            idxs.append(np.empty((1,1)).astype(int))
             sws.append(np.zeros(len(coords[1])*len(coords[2])))
             model_lens.append(0)
             continue
@@ -315,7 +315,12 @@ def _setup_interpolate(radar, coords, dmask, Rc, multiprocessing, k, verbose):
         if np.any(valid):
             kidx = max(np.where(valid==1)[1])+1
         else:
-            kidx = 0
+            # no valid points from KDTree (valid data coming are outside all ROI regions (outside grid))
+            weights.append(np.empty((1,1)).astype(int))
+            idxs.append(np.empty((1,1)).astype(int))
+            sws.append(np.zeros(len(coords[1])*len(coords[2])))
+            model_lens.append(0)
+            continue
         
         if valid[:,-1].sum() > 0:
             warnings.warn("\n Some points are being left out of radius of influence, make 'k' bigger!")
@@ -393,7 +398,7 @@ def cressman_ppi_interp(radar, coords, field_names, gatefilter = None, Rc=None, 
     dmask = get_data_mask(radar, field_names)
     Rc = get_leroy_roi(radar, coords, frac=0.55)
     weights, idxs, model_idxs, sw, model_lens = _setup_interpolate(radar, coords, dmask, Rc, 
-                                                                   multiprocessing, k, verbose)           
+                                                                   multiprocessing, k, verbose)
     Z, Y, X = np.meshgrid(coords[0], coords[1], coords[2], indexing="ij")
     ppi_height = _calculate_ppi_heights(radar, coords, Rc, multiprocessing, ground_elevation)
     
