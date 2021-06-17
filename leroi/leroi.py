@@ -478,6 +478,25 @@ def cressman_ppi_interp(
 
 
 def build_pyart_grid(radar, fields, gs, gb):
+    """
+    Generate a PyART Grid object from a Radar Object and gridded fields.
+
+    Parameters:
+    ===========
+    radar: (object)
+        pyart radar object
+    fields: (dict) 
+        Radar fields to include in Grid.
+    gs: Tuple[int, int, int]
+        Tuple of the size of (z, y, x)
+    gb: Tuple[Tuple[float, float], Tuple[float, float], Tuple[float, float]]
+        Tuple of 3 tuples containing ((zmin, zmax), (ymin, ymax), (xmin, xmax))
+
+    Returns:
+    ========
+    grid: pyart.core.Grid
+        PyART Grid.
+    """
     # build pyart grid object
 
     # time dictionaries
