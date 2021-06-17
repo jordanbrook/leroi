@@ -22,7 +22,7 @@ setup(
     long_description=long_description,
     long_description_content_type="text/markdown",
     url="https://github.com/jordanbrook/leroi",
-    author="Meteocat",    
+    author="Jordan Brook",    
     # For a list of valid classifiers, see https://pypi.org/classifiers/
     classifiers=[  # Optional
         "Development Status :: 3 - Alpha",
@@ -37,5 +37,5 @@ setup(
     keywords="radar weather meteorology correction",
     packages=find_packages(exclude=["notebook"]),
     install_requires=["numpy", "arm_pyart", "astropy", "scipy"],
-    project_urls={"Source": "https://github.com/paltube/vcor_dual_prf/",},
+    project_urls={"Source": "https://github.com/jordanbrook/leroi/",},
 )
