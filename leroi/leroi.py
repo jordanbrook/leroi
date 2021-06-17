@@ -70,7 +70,7 @@ def get_leroy_roi(radar, coords, frac=0.55):
             roi = r
     return roi
 
-def _calculate_ppi_heights(radar, coords, Rc, multiprocessing):
+def _calculate_ppi_heights(radar, coords, Rc, multiprocessing, ground_elevation):
     """
     Calculate the height of ppi scans in horizontal cartesian coordinates
     
@@ -84,6 +84,8 @@ def _calculate_ppi_heights(radar, coords, Rc, multiprocessing):
         Cressman radius of influence
     multiprocessing: (bool)
         whether to use multiple threads in scipy.cKDTree.query()
+    ground_elevation: (float)
+        make first tilt equal to 0 height if below this elevation
         
     Returns:
     --------
@@ -334,8 +336,8 @@ def _setup_interpolate(radar, coords, dmask, Rc, multiprocessing, k, verbose):
     # stack weights 
     return weights, idxs, model_idxs[:,:max(model_lens)].astype(int), np.array(sws), model_lens
 
-def cressman_ppi_interp(radar, coords, field_names, gatefilter = None, Rc=None, k=100, 
-                        filter_its=0, verbose=True, kernel=None, corr_lens=None, multiprocessing=True):
+def cressman_ppi_interp(radar, coords, field_names, gatefilter = None, Rc=None, k=100, filter_its=0, 
+                        verbose=True, kernel=None, corr_lens=None, multiprocessing=True, ground_elevation = -999):
     """
     Interpolate multiple fields from a radar object to a grid. This 
     is an implementation of the method described in Dahl et. al. (2019).
@@ -363,6 +365,8 @@ def cressman_ppi_interp(radar, coords, field_names, gatefilter = None, Rc=None, 
         correlation lengths for smoothing filter in vert. and horiz. dims resp.
     multiprocessing: (bool)
         whether to use multiple threads in scipy.cKDTree.query()
+    ground_elevation: (float)
+        make first tilt equal to 0 height if below this elevation
     
     Returns:
     --------
@@ -388,7 +392,7 @@ def cressman_ppi_interp(radar, coords, field_names, gatefilter = None, Rc=None, 
     weights, idxs, model_idxs, sw, model_lens = _setup_interpolate(radar, coords, dmask, Rc, 
                                                                    multiprocessing, k, verbose)           
     Z, Y, X = np.meshgrid(coords[0], coords[1], coords[2], indexing="ij")
-    ppi_height = _calculate_ppi_heights(radar, coords, Rc, multiprocessing)
+    ppi_height = _calculate_ppi_heights(radar, coords, Rc, multiprocessing, ground_elevation)
     
     if ppi_height.mask.sum() > 0:
         warnings.warn("""\n There are invalid height values which will 
