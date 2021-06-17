@@ -37,5 +37,5 @@ setup(
     keywords="radar weather meteorology correction",
     packages=find_packages(exclude=["notebook"]),
     install_requires=["numpy", "arm_pyart", "astropy", "scipy"],
-    project_urls={"Source": "https://github.com/paltube/vcor_dual_prf/",},
+    project_urls={"Source": "https://github.com/jordanbrook/leroi/",},
 )
