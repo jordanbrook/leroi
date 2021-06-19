@@ -418,7 +418,6 @@ def cressman_ppi_interp(
             print("Radius of influence set to {} m.".format(Rc))
 
     dmask = get_data_mask(radar, field_names)
-    Rc = get_leroy_roi(radar, coords, frac=0.55)
     weights, idxs, model_idxs, sw, model_lens = _setup_interpolate(
         radar, coords, dmask, Rc, multiprocessing, k, verbose
     )
