@@ -413,7 +413,7 @@ def cressman_ppi_interp(
     dims = [len(coord) for coord in coords]
 
     if Rc is None:
-        Rc = get_leroy_roi(radar, coords, frac=0.55)
+        Rc = get_leroy_roi(radar, coords)
         if verbose:
             print("Radius of influence set to {} m.".format(Rc))
 
