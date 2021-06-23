@@ -457,7 +457,8 @@ def cressman_ppi_interp(
         try:
             grid = interp_along_axis(out.filled(np.nan), ppi_height, Z, axis=0, method="linear")
         except UnboundLocalError:
-            print(f"Problem with {field}. Field not processed.")
+            if verbose:
+                print(f"LeROI: Problem with {field}. Field not processed.")
             continue
 
         if filter_its > 0:
