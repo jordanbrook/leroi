@@ -43,11 +43,11 @@ def get_data_mask(radar, fields, gatefilter=None):
     return ~mask
 
 
-def get_leroy_roi(radar, coords, frac=0.55):
+def get_leroy_roi(radar, coords, frac=0.6):
     """
     Get a radius of influence for the ppis based on the azimuthal spacing of each sweep
     Refer to Dahl et al (2019) for details here.
-
+    
     Parameters:
     -----------
     radar (object):
@@ -56,14 +56,14 @@ def get_leroy_roi(radar, coords, frac=0.55):
         list of arrays containing z, y, x dimensions
     frac (float):
         fraction of largest data spacing to set ROI
-
+        
     Returns:
     --------
     roi (float):
         radius of influence for ppi cressman gridding
     """
     roi = 0
-    rmax = np.sqrt(max(coords[0]) ** 2 + max(coords[1]) ** 2 + max(coords[2]) ** 2)
+    rmax = np.sqrt(max(abs(coords[0])) ** 2 + max(abs(coords[1])) ** 2 + max(abs(coords[2])) ** 2)
     sort_idx = np.argsort(radar.fixed_angle["data"])
     for i in sort_idx:
         az = np.amax(np.radians(np.amax(np.diff(np.sort(radar.azimuth["data"][radar.get_slice(i)])))))
@@ -413,12 +413,11 @@ def cressman_ppi_interp(
     dims = [len(coord) for coord in coords]
 
     if Rc is None:
-        Rc = get_leroy_roi(radar, coords, frac=0.55)
+        Rc = get_leroy_roi(radar, coords)
         if verbose:
             print("Radius of influence set to {} m.".format(Rc))
 
     dmask = get_data_mask(radar, field_names)
-    Rc = get_leroy_roi(radar, coords, frac=0.55)
     weights, idxs, model_idxs, sw, model_lens = _setup_interpolate(
         radar, coords, dmask, Rc, multiprocessing, k, verbose
     )
