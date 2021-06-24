@@ -452,13 +452,11 @@ def cressman_ppi_interp(
                 out = np.ma.masked_array(
                     ppis.reshape((radar.nsweeps, dims[1], dims[2])), mask.reshape((radar.nsweeps, dims[1], dims[2]))
                 )
+            else:
+                out = np.ma.masked_array(np.zeros((radar.nsweeps, dims[1], dims[2])), 
+                                         np.ones((radar.nsweeps, dims[1], dims[2])))
 
-        try:
-            grid = interp_along_axis(out.filled(np.nan), ppi_height, Z, axis=0, method="linear")
-        except UnboundLocalError:
-            if verbose:
-                print(f"LeROI: Problem with {field}. Field not processed.")
-            continue
+        grid = interp_along_axis(out.filled(np.nan), ppi_height, Z, axis=0, method="linear")
 
         if filter_its > 0:
             grid = smooth_grid(grid, coords, kernel, corr_lens, filter_its, verbose)
@@ -477,7 +475,7 @@ def cressman_ppi_interp(
     return fields
 
 
-def build_pyart_grid(radar, fields, gs, gb):
+def build_pyart_grid(radar, fields, gs, gb, origin = None):
     """
     Generate a PyART Grid object from a Radar Object and gridded fields.
 
@@ -491,6 +489,9 @@ def build_pyart_grid(radar, fields, gs, gb):
         Tuple of the size of (z, y, x)
     gb: Tuple[Tuple[float, float], Tuple[float, float], Tuple[float, float]]
         Tuple of 3 tuples containing ((zmin, zmax), (ymin, ymax), (xmin, xmax))
+    origin: Tuple(float, float, float)
+        Tuple containing the altitude, latitude, longitude of grid origin,
+            defaults to radar position if not provided. 
 
     Returns:
     ========
@@ -508,10 +509,16 @@ def build_pyart_grid(radar, fields, gs, gb):
     # grid origin location dictionaries
     origin_latitude = get_metadata("origin_latitude")
     origin_longitude = get_metadata("origin_longitude")
-    origin_latitude["data"] = radar.latitude["data"]
-    origin_longitude["data"] = radar.longitude["data"]
     origin_altitude = get_metadata("origin_altitude")
-    origin_altitude["data"] = radar.altitude["data"]
+    
+    if origin is None:
+        origin_latitude["data"] = radar.latitude["data"]
+        origin_longitude["data"] = radar.longitude["data"]
+        origin_altitude["data"] = radar.altitude["data"]
+    else:
+        origin_altitude["data"]  = origin[0]
+        origin_latitude["data"]  = origin[1]
+        origin_longitude["data"] = origin[2]
 
     # grid coordinate dictionaries
     nz, ny, nx = gs
