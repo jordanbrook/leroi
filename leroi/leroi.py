@@ -449,13 +449,9 @@ def cressman_ppi_interp(
                     np.sum(data[idxs[i]] * weights[i], axis=1) / sw[i, model_idxs[i, : model_lens[i]]]
                 )
                 mask[i, model_idxs[i, : model_lens[i]]] = 0
-                out = np.ma.masked_array(
-                    ppis.reshape((radar.nsweeps, dims[1], dims[2])), mask.reshape((radar.nsweeps, dims[1], dims[2]))
-                )
-            else:
-                out = np.ma.masked_array(np.zeros((radar.nsweeps, dims[1], dims[2])), 
-                                         np.ones((radar.nsweeps, dims[1], dims[2])))
-
+        out = np.ma.masked_array(
+            ppis.reshape((radar.nsweeps, dims[1], dims[2])), mask.reshape((radar.nsweeps, dims[1], dims[2]))
+        )
         grid = interp_along_axis(out.filled(np.nan), ppi_height, Z, axis=0, method="linear")
 
         if filter_its > 0:
