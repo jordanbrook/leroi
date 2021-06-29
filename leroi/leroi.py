@@ -417,7 +417,7 @@ def cressman_ppi_interp(
         if verbose:
             print("Radius of influence set to {} m.".format(Rc))
 
-    dmask = get_data_mask(radar, field_names)
+    dmask = get_data_mask(radar, field_names, gatefilter)
     weights, idxs, model_idxs, sw, model_lens = _setup_interpolate(
         radar, coords, dmask, Rc, multiprocessing, k, verbose
     )
