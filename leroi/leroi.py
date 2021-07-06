@@ -139,7 +139,8 @@ def _calculate_ppi_heights(radar, coords, Rc, multiprocessing, ground_elevation)
     return np.ma.asarray(slices)
 
 
-def smooth_grid(grid, coords, kernel, corr_lens, filter_its, verbose):
+def smooth_grid(grid, coords, verbose, kernel=None, corr_lens=None, 
+                filter_its=0, preserve_nan=False, boundary = "extend"):
     """
     Smooth a gridded field (postprocessing step)
 
@@ -184,7 +185,7 @@ def smooth_grid(grid, coords, kernel, corr_lens, filter_its, verbose):
 
     smooth = grid.copy()
     for i in range(filter_its):
-        smooth = convolve(smooth, kernel, boundary="extend")
+        smooth = convolve(smooth, kernel, boundary=boundary, preserve_nan=preserve_nan)
 
     return smooth.copy()
 
@@ -358,10 +359,8 @@ def cressman_ppi_interp(
     gatefilter=None,
     Rc=None,
     k=100,
-    filter_its=0,
     verbose=True,
-    kernel=None,
-    corr_lens=None,
+    smooth_kw = {'filter_its':0},
     multiprocessing=True,
     ground_elevation=-999,
 ):
@@ -454,8 +453,8 @@ def cressman_ppi_interp(
         )
         grid = interp_along_axis(out.filled(np.nan), ppi_height, Z, axis=0, method="linear")
 
-        if filter_its > 0:
-            grid = smooth_grid(grid, coords, kernel, corr_lens, filter_its, verbose)
+        if smooth_kw['filter_its'] > 0:
+            grid = smooth_grid(grid, coords, verbose, **smooth_kw)
 
         # add to output dictionary
         fields[field] = {"data": np.ma.masked_array(grid, mask=np.isnan(grid))}
