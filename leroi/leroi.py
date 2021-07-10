@@ -9,6 +9,38 @@ from astropy.convolution import convolve
 from pyart.config import get_metadata
 import warnings
 
+def fill_heights(a):
+    """
+    Function to fill in fake, monotonically increasing heights for columns
+        which have valid data in the column either above or below. If 
+        there is missing heights in the middle of a column (which shouldn't
+        happen) or if there are complete missing columns (grid outside radar
+        range), a warning is raise to the user. 
+    
+    Inputs:
+    -------
+    a : (np.ma.masked_array)
+        heights array, masked values in columns will be filled
+          
+    Outputs:
+    out : (np.ma.masked_array)
+        filled heights
+    """
+    valid = ~a.mask
+    a = a.filled(np.nan)
+    bidx = valid.argmax(axis=0)
+    tidx = valid.shape[0]-np.flip(valid, axis = 0).argmax(axis=0)
+    J,I = np.where(bidx!=0)
+    for j,i in zip(J,I):
+        a[:bidx[j,i],j,i] = a[bidx[j,i],j,i]
+    J,I = np.where(tidx!=3)
+    for j,i in zip(J,I):
+        a[tidx[j,i]:,j,i] = a[(tidx[j,i]-1),j,i]
+    out = np.ma.masked_invalid(a)
+    if (out.mask).sum() >0:
+        warnings.warn("""There are still missing heights despite filling.
+        This means the grid is OUTSIDE the radar range!""")
+    return out
 
 def get_data_mask(radar, fields, gatefilter=None):
     """
@@ -422,14 +454,9 @@ def cressman_ppi_interp(
     )
     Z, Y, X = np.meshgrid(coords[0], coords[1], coords[2], indexing="ij")
     ppi_height = _calculate_ppi_heights(radar, coords, Rc, multiprocessing, ground_elevation)
-
-    if ppi_height.mask.sum() > 0:
-        warnings.warn(
-            """\n There are invalid height values which will
-        ruin the linear interpolation. This most likely means the radar
-        doesnt cover the entire gridded domain"""
-        )
-
+    # fill in the nan heights. If there is no height data, there will be no radar data by definition.
+    ppi_height = fill_heights(ppi_height)
+    
     elevations = radar.fixed_angle["data"]
 
     # sort sweep index to process from lowest sweep and ascend
