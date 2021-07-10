@@ -105,7 +105,7 @@ def get_leroy_roi(radar, coords, frac=0.6):
     return roi
 
 
-def _calculate_ppi_heights(radar, coords, Rc, multiprocessing, ground_elevation):
+def _calculate_ppi_heights(radar, coords, weight_type, Rc, multiprocessing, ground_elevation):
     """
     Calculate the height of ppi scans in horizontal cartesian coordinates
 
@@ -146,13 +146,19 @@ def _calculate_ppi_heights(radar, coords, Rc, multiprocessing, ground_elevation)
         idx[idx == len(data)] = 0
 
         # do all of the weighting stuff based on kdtree distance
-        d[np.isinf(d)] = Rc + 1e3
+        d[np.isinf(d)] = Rc + 1e5
         d2, r2 = d ** 2, Rc ** 2
-        w = (r2 - d2) / (r2 + d2)
-        w[w < 0] = 0
+        if weight_type == 'Barnes':
+            w = np.exp(-(d2) / (r2/4))
+            w[w<np.exp(-4)] = 0
+        elif weight_type == 'Cressman':
+            w = (r2 - d2) / (r2 + d2)
+            w[w < 0] = 0
+        else:
+            raise NotImplementedError("'weight_type' must be either 'Barnes' or 'Cressman'")
+        
         sw = np.sum(w, axis=1)
         valid = sw != 0
-
         # put valid data into a resultant array and reshape to model grid
         slce = np.zeros(sw.shape)
         # set lowest scan heights to zeros if requested
@@ -308,7 +314,7 @@ def interp_along_axis(y, x, newx, axis, inverse=False, method="linear"):
     return np.moveaxis(newy, 0, axis)
 
 
-def _setup_interpolate(radar, coords, dmask, Rc, multiprocessing, k, verbose):
+def _setup_interpolate(radar, coords, dmask, weight_type, Rc, multiprocessing, k, verbose):
     """
     Setup all the stuff needed for the ppi interpolation
     """
@@ -368,10 +374,17 @@ def _setup_interpolate(radar, coords, dmask, Rc, multiprocessing, k, verbose):
         idx[idx == ndata] = 0
 
         # do all of the weighting stuff based on kdtree distance
-        d[np.isinf(d)] = Rc + 1e3
+        d[np.isinf(d)] = Rc + 1e5
         d2, r2 = d ** 2, Rc ** 2
-        w = (r2 - d2) / (r2 + d2)
-        w[w < 0] = 0
+        if weight_type == 'Barnes':
+            w = np.exp(-(d2) / (r2/4))
+            w[w<np.exp(-4)] = 0
+        elif weight_type == 'Cressman':
+            w = (r2 - d2) / (r2 + d2)
+            w[w < 0] = 0
+        else:
+            raise NotImplementedError("'weight_type' must be either 'Barnes' or 'Cressman'")
+            
         sw = np.sum(w, axis=1)
         model_idx = np.where(sw != 0)[0]
         model_idxs[j][: len(model_idx)] = model_idx
@@ -384,11 +397,12 @@ def _setup_interpolate(radar, coords, dmask, Rc, multiprocessing, k, verbose):
     return weights, idxs, model_idxs[:, : max(model_lens)].astype(int), np.array(sws), model_lens
 
 
-def cressman_ppi_interp(
+def leroi_interp(
     radar,
     coords,
     field_names=None,
     gatefilter=None,
+    weight_type = 'Barnes',
     Rc=None,
     k=100,
     verbose=True,
@@ -409,6 +423,8 @@ def cressman_ppi_interp(
         field names in radar to interpolate
     gatefilter: object
         pyart gatefilter object
+    weight_type: (string)
+        Type of weighting, either 'Barnes' or 'Cressman'
     Rc: (float)
         Cressman radius of interpolation, calculated if not supplied
     k: (int)
@@ -450,10 +466,10 @@ def cressman_ppi_interp(
 
     dmask = get_data_mask(radar, field_names, gatefilter)
     weights, idxs, model_idxs, sw, model_lens = _setup_interpolate(
-        radar, coords, dmask, Rc, multiprocessing, k, verbose
+        radar, coords, dmask, weight_type, Rc, multiprocessing, k, verbose
     )
     Z, Y, X = np.meshgrid(coords[0], coords[1], coords[2], indexing="ij")
-    ppi_height = _calculate_ppi_heights(radar, coords, Rc, multiprocessing, ground_elevation)
+    ppi_height = _calculate_ppi_heights(radar, coords, weight_type, Rc, multiprocessing, ground_elevation)
     # fill in the nan heights. If there is no height data, there will be no radar data by definition.
     ppi_height = fill_heights(ppi_height)
     
