@@ -174,7 +174,7 @@ def _calculate_ppi_heights(radar, coords, weight_type, Rc, multiprocessing, grou
         slce = np.ma.masked_array(slce, mask=~valid)
         slices.append(slce.reshape((len(coords[1]), len(coords[2]))))
 
-    return np.ma.asarray(slices)
+    return np.ma.stack(slices)
 
 
 def smooth_grid(grid, coords, verbose, kernel=None, corr_lens=None, 
