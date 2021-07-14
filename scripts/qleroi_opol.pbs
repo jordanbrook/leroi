@@ -1,0 +1,12 @@
+#!/bin/bash
+#PBS -P kl02
+#PBS -q normal
+#PBS -l walltime=10:00:00
+#PBS -l mem=64GB
+#PBS -l wd
+#PBS -l jobfs=1GB
+#PBS -l ncpus=16
+#PBS -lstorage=scratch/kl02+gdata/hj10+gdata/rt52+gdata/kl02+gdata/rq0+gdata/rr5
+source activate radar
+
+python grid_leroy.py -i /scratch/kl02/vhl548/opol/ppi/

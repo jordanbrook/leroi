@@ -1,0 +1,14 @@
+function took longer than 120 seconds
+
+======================================================================================
+                  Resource Usage on 2021-06-25 10:55:39:
+   Job Id:             24487032.gadi-pbs
+   Project:            kl02
+   Exit Status:        0
+   Service Units:      75.84
+   NCPUs Requested:    16                     NCPUs Used: 16              
+                                           CPU Time Used: 21:07:12                                   
+   Memory Requested:   64.0GB                Memory Used: 52.74GB         
+   Walltime requested: 10:00:00            Walltime Used: 02:22:12        
+   JobFS requested:    1.0GB                  JobFS used: 0B              
+======================================================================================
