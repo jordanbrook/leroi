@@ -29,8 +29,8 @@ def chunks(l, n: int):
     """
     for i in range(0, len(l), n):
         yield l[i : i + n]
-        
-        
+
+
 def get_dtype():
     keytypes = {
         "air_echo_classification": np.int16,
@@ -151,18 +151,41 @@ def mkdir(dirpath: str) -> None:
 def leroy_grid(radar, coords, field):
     with warnings.catch_warnings():
         warnings.filterwarnings("ignore")
-        return leroi.leroi_interp(
-            radar,
-            coords, field,
-            k=200,
-            verbose=False,            
-            multiprocessing=False
-        )
+        return leroi.leroi_interp(radar, coords, field, k=200, verbose=False, multiprocessing=False)
+
+
+def get_date(infile: str):
+    """
+    Get date from netCDF4 file
+
+    Parameter:
+    ==========
+    infile: str
+        Input netCDF4 file.
+    """
+    with netCDF4.Dataset(infile) as ncid:
+        radar_date = cftime.num2pydate(ncid["time"][0], ncid["time"].units)
+    return radar_date
 
 
 def gridfile(infile) -> None:
     good_keys = GOOD_KEYS
     output_directory = OUTDIR
+
+    radar_date = get_date(infile)
+    year = str(radar_date.year)
+    datestr = radar_date.strftime("%Y%m%d")
+    datetimestr = radar_date.strftime("%Y%m%d_%H%M")
+
+    outpath = os.path.join(output_directory, year, datestr)
+    os.makedirs(outpath, exist_ok=True)
+
+    outfilename = f"502_{datetimestr}00_grid.nc"
+    outfilename = os.path.join(outpath, outfilename)
+    if os.path.exists(outfilename):
+        print(f"Output file already exists {outfilename}")
+        return None
+
     radar = pyart.io.read(infile)
 
     # Update radar dtype:
@@ -175,30 +198,16 @@ def gridfile(infile) -> None:
         if k not in good_keys:
             _ = radar.fields.pop(k)
 
-    radar_date = cftime.num2pydate(radar.time["data"][0], radar.time["units"])
-    year = str(radar_date.year)
-    datestr = radar_date.strftime("%Y%m%d")
-    datetimestr = radar_date.strftime("%Y%m%d_%H%M")
-
     # radar.fields["corrected_reflectivity"]["data"] += 1.1  # OPOL
-
-    outpath = os.path.join(output_directory, year, datestr)        
-    os.makedirs(outpath, exist_ok=True)
-
-    outfilename = f"502_{datetimestr}00_grid.nc"
-    outfilename = os.path.join(outpath, outfilename)
-    if os.path.exists(outfilename):
-        print(f"Output file already exists {outfilename}")
-        return None
 
     gs = (41, 301, 301)
     gb = ((0, 20000), (-150000, 150000), (-150000, 150000))
     center_pos = (0, 0, 0)
-    lon0, lat0 = radar.longitude['data'][0], radar.latitude['data'][0]
+    # lon0, lat0 = radar.longitude["data"][0], radar.latitude["data"][0]
 
-    x = np.linspace(gb[2][0],gb[2][1], gs[2])
-    y = np.linspace(gb[1][0],gb[1][1], gs[1])
-    z = np.linspace(gb[0][0],gb[0][1], gs[0])
+    x = np.linspace(gb[2][0], gb[2][1], gs[2])
+    y = np.linspace(gb[1][0], gb[1][1], gs[1])
+    z = np.linspace(gb[0][0], gb[0][1], gs[0])
     coords = (z - center_pos[0], y - center_pos[1], x - center_pos[2])
 
     gridded_fields = leroy_grid(radar, coords, [*radar.fields.keys()])
@@ -249,18 +258,18 @@ def buffer(infile):
     try:
         gridfile(infile)
     except Exception:
-        traceback.print_exc()   
+        traceback.print_exc()
 
     return None
 
 
-def main():    
+def main():
     inpath = os.path.join(INDIR, "**", "*.nc")
     flist = glob.glob(inpath)
     if len(flist) == 0:
         print(f"No file found in {inpath}. Doing nothing")
         return None
-        
+
     with ProcessPool(max_workers=16, max_tasks=2) as pool:
         future = pool.map(buffer, flist, timeout=120)
         iterator = future.result()
@@ -275,14 +284,14 @@ def main():
             except ProcessExpired as error:
                 print("%s. Exit code: %d" % (error, error.exitcode))
             except Exception:
-                traceback.print_exc()        
-        
+                traceback.print_exc()
+
     return None
 
 
 if __name__ == "__main__":
     GOOD_KEYS = [
-#         "air_echo_classification",
+        #         "air_echo_classification",
         "corrected_differential_phase",
         "corrected_differential_reflectivity",
         "corrected_reflectivity",
@@ -300,15 +309,11 @@ if __name__ == "__main__":
     parser_description = """Grid content of directory using LeROI"""
     parser = argparse.ArgumentParser(description=parser_description)
     parser.add_argument("-i", "--input", dest="indir", type=str, help="Input directory", required=True)
-    parser.add_argument("-o", "--output", dest="outdir", type=str, help="Output directory.", default="/scratch/kl02/vhl548/cpol/leroi/")
+    parser.add_argument(
+        "-o", "--output", dest="outdir", type=str, help="Output directory.", default="/scratch/kl02/vhl548/cpol/leroi/"
+    )
     args = parser.parse_args()
     OUTDIR = args.outdir
     INDIR = args.indir
 
     main()
-
-
-
-
-
-
