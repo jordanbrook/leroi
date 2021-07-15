@@ -2,6 +2,7 @@
 # coding: utf-8
 
 import os
+import gc
 import glob
 import uuid
 import datetime
@@ -150,13 +151,11 @@ def mkdir(dirpath: str) -> None:
 def leroy_grid(radar, coords, field):
     with warnings.catch_warnings():
         warnings.filterwarnings("ignore")
-        return leroi.cressman_ppi_interp(
+        return leroi.leroi_interp(
             radar,
             coords, field,
             k=200,
-            verbose=False,
-            filter_its = 0,
-            corr_lens = (800, 2000),
+            verbose=False,            
             multiprocessing=False
         )
 
@@ -181,12 +180,10 @@ def gridfile(infile) -> None:
     datestr = radar_date.strftime("%Y%m%d")
     datetimestr = radar_date.strftime("%Y%m%d_%H%M")
 
-    # radar.fields["corrected_reflectivity"]["data"] += 1.1
+    # radar.fields["corrected_reflectivity"]["data"] += 1.1  # OPOL
 
-    outpath = os.path.join(output_directory, year)
-    mkdir(outpath)
-    outpath = os.path.join(outpath, datestr)
-    mkdir(outpath)
+    outpath = os.path.join(output_directory, year, datestr)        
+    os.makedirs(outpath, exist_ok=True)
 
     outfilename = f"502_{datetimestr}00_grid.nc"
     outfilename = os.path.join(outpath, outfilename)
@@ -252,7 +249,7 @@ def buffer(infile):
     try:
         gridfile(infile)
     except Exception:
-        traceback.print_exc()
+        traceback.print_exc()   
 
     return None
 
@@ -263,48 +260,47 @@ def main():
     if len(flist) == 0:
         print(f"No file found in {inpath}. Doing nothing")
         return None
-    
-    for flist_chunk in chunks(flist, 32):
-        with ProcessPool() as pool:
-            future = pool.map(buffer, flist_chunk, timeout=120)
-            iterator = future.result()
+        
+    with ProcessPool(max_workers=16, max_tasks=2) as pool:
+        future = pool.map(buffer, flist, timeout=120)
+        iterator = future.result()
 
-            while True:
-                try:
-                    _ = next(iterator)
-                except StopIteration:
-                    break
-                except TimeoutError as error:
-                    print("function took longer than %d seconds" % error.args[1])
-                except ProcessExpired as error:
-                    print("%s. Exit code: %d" % (error, error.exitcode))
-                except Exception:
-                    traceback.print_exc()
-
+        while True:
+            try:
+                _ = next(iterator)
+            except StopIteration:
+                break
+            except TimeoutError as error:
+                print("function took longer than %d seconds" % error.args[1])
+            except ProcessExpired as error:
+                print("%s. Exit code: %d" % (error, error.exitcode))
+            except Exception:
+                traceback.print_exc()        
+        
     return None
 
 
 if __name__ == "__main__":
     GOOD_KEYS = [
 #         "air_echo_classification",
-#         "corrected_differential_phase",
-#         "corrected_differential_reflectivity",
+        "corrected_differential_phase",
+        "corrected_differential_reflectivity",
         "corrected_reflectivity",
-#         "corrected_specific_differential_phase",
+        "corrected_specific_differential_phase",
         "corrected_velocity",
         "velocity",
-#         "cross_correlation_ratio",
-#         "normalized_coherent_power",
-#         "radar_echo_classification",
-#         "radar_estimated_rain_rate",
-#         "signal_to_noise_ratio",
-#         "spectrum_width",
+        "cross_correlation_ratio",
+        "normalized_coherent_power",
+        "radar_echo_classification",
+        "radar_estimated_rain_rate",
+        "signal_to_noise_ratio",
+        "spectrum_width",
         "total_power",
     ]
     parser_description = """Grid content of directory using LeROI"""
     parser = argparse.ArgumentParser(description=parser_description)
     parser.add_argument("-i", "--input", dest="indir", type=str, help="Input directory", required=True)
-    parser.add_argument("-o", "--output", dest="outdir", type=str, help="Output directory.", default="/scratch/kl02/vhl548/opol/")
+    parser.add_argument("-o", "--output", dest="outdir", type=str, help="Output directory.", default="/scratch/kl02/vhl548/cpol/leroi/")
     args = parser.parse_args()
     OUTDIR = args.outdir
     INDIR = args.indir
