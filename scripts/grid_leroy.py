@@ -2,7 +2,6 @@
 # coding: utf-8
 
 import os
-import gc
 import glob
 import uuid
 import datetime
@@ -16,7 +15,6 @@ import pyart
 import cftime
 import netCDF4
 import numpy as np
-import matplotlib.pyplot as pl
 
 from concurrent.futures import TimeoutError
 from pebble import ProcessPool, ProcessExpired
@@ -169,6 +167,14 @@ def get_date(infile: str):
 
 
 def gridfile(infile) -> None:
+    """
+    Grid radar file.
+
+    Parameter:
+    ==========
+    infile: str
+        Input netCDF4 file.
+    """
     good_keys = GOOD_KEYS
     output_directory = OUTDIR
 
