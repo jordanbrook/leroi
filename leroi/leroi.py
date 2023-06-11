@@ -286,8 +286,8 @@ def interp_along_axis(y, x, newx, axis, inverse=False, method="linear"):
         while np.any(needs_update):
             i_lower = np.where(needs_update, i_lower + 1, i_lower)
             i_upper = i_lower + 1
-            x_lower = _x[[i_lower] + ind]
-            x_upper = _x[[i_upper] + ind]
+            x_lower = _x[tuple([i_lower] + ind)]
+            x_upper = _x[tuple([i_upper] + ind)]
             # Check again
             needs_update = (xi > x_upper) & (i_upper + 1 < len(_x))
         # Express the position of xi relative to its neighbours
@@ -295,13 +295,13 @@ def interp_along_axis(y, x, newx, axis, inverse=False, method="linear"):
         # Determine where there is a valid interpolation range
         within_bounds = (_x[0, ...] < xi) & (xi < _x[-1, ...])
         if method == "linear":
-            f0, f1 = _y[[i_lower] + ind], _y[[i_upper] + ind]
+            f0, f1 = _y[tuple([i_lower] + ind)], _y[tuple([i_upper] + ind)]
             a = f1 - f0
             b = f0
             newy[i, ...] = np.where(within_bounds, a * xj + b, np.nan)
         elif method == "cubic":
-            f0, f1 = _y[[i_lower] + ind], _y[[i_upper] + ind]
-            df0, df1 = ydx[[i_lower] + ind], ydx[[i_upper] + ind]
+            f0, f1 = _y[tuple([i_lower] + ind)], _y[tuple([i_upper] + ind)]
+            df0, df1 = ydx[tuple([i_lower] + ind)], ydx[tuple([i_upper] + ind)]
             a = 2 * f0 - 2 * f1 + df0 + df1
             b = -3 * f0 + 3 * f1 - 2 * df0 - df1
             c = df0
@@ -314,7 +314,7 @@ def interp_along_axis(y, x, newx, axis, inverse=False, method="linear"):
     return np.moveaxis(newy, 0, axis)
 
 
-def _setup_interpolate(radar, coords, dmask, weight_type, Rc, multiprocessing, k, verbose):
+def _setup_interpolate(radar, coords, dmask, weight_type, Rc, multiprocessing, k, verbose, advection, t0):
     """
     Setup all the stuff needed for the ppi interpolation
     """
@@ -339,6 +339,8 @@ def _setup_interpolate(radar, coords, dmask, weight_type, Rc, multiprocessing, k
     # loop through ppis
     for j, i in enumerate(sort_idx):
         x, y, z = radar.get_gate_x_y_z(i)
+        x -= advection[0] * (radar.time['data'] - t0)[radar.get_slice(i),np.newaxis]
+        y -= advection[1] * (radar.time['data'] - t0)[radar.get_slice(i),np.newaxis]
         mask = ~dmask[radar.get_slice(i)].flatten()
 
         # dont bother with ckdtree if there's no data
@@ -409,6 +411,8 @@ def leroi_interp(
     smooth_kw = {'filter_its':0},
     multiprocessing=True,
     ground_elevation=-999,
+    advection = (0,0),
+    t0 = 0
 ):
     """
     Interpolate multiple fields from a radar object to a grid. This
@@ -441,6 +445,8 @@ def leroi_interp(
         whether to use multiple threads in scipy.cKDTree.query()
     ground_elevation: (float)
         make first tilt equal to 0 height if below this elevation
+    advection: (tuple)
+        U and V constant advection in m/s
 
     Returns:
     --------
@@ -448,7 +454,7 @@ def leroi_interp(
         list or array containing all interpolated field(s)
 
     """
-    t0 = time.time()
+    ti = time.time()
 
     if field_names is None:
         # No field defined. Processing all fields in radar.
@@ -466,7 +472,7 @@ def leroi_interp(
 
     dmask = get_data_mask(radar, field_names, gatefilter)
     weights, idxs, model_idxs, sw, model_lens = _setup_interpolate(
-        radar, coords, dmask, weight_type, Rc, multiprocessing, k, verbose
+        radar, coords, dmask, weight_type, Rc, multiprocessing, k, verbose, advection, t0
     )
     Z, Y, X = np.meshgrid(coords[0], coords[1], coords[2], indexing="ij")
     ppi_height = _calculate_ppi_heights(radar, coords, weight_type, Rc, multiprocessing, ground_elevation)
@@ -508,7 +514,7 @@ def leroi_interp(
             fields[field][key] = radar.fields[field][key]
 
     if verbose:
-        print("Took: ", time.time() - t0)
+        print("Took: ", time.time() - ti)
 
     return fields
 
