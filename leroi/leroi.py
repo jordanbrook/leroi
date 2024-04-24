@@ -138,7 +138,7 @@ def _calculate_ppi_heights(radar, coords, weight_type, Rc, multiprocessing, grou
     if 90.0 in elevations:
         sort_idx.remove(np.argwhere(elevations == 90))
     Y, X = np.meshgrid(coords[1], coords[2], indexing="ij")
-    for i in sort_idx:
+    for j,i in enumerate(sort_idx):
         x, y, z = radar.get_gate_x_y_z(i)
         data = z.ravel()
         tree = cKDTree(np.c_[y.ravel(), x.ravel()])
@@ -162,7 +162,7 @@ def _calculate_ppi_heights(radar, coords, weight_type, Rc, multiprocessing, grou
         # put valid data into a resultant array and reshape to model grid
         slce = np.zeros(sw.shape)
         # set lowest scan heights to zeros if requested
-        if (i == 0) and (elevations[i] <= ground_elevation):
+        if (j == 0) and (elevations[i] <= ground_elevation):
             pass
         # dont worry if there's no valid data, masked anyway
         elif len(data) == 0:
